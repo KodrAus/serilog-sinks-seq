@@ -205,7 +205,9 @@ public class SeqCompactJsonFormatterTests
             { "cpu.usage", new { kind = "Gauge" } }
         };
 
-        var jObject = AssertValidJson(log => log.Information("{@Definitions}", definitions));
+        var jObject = AssertValidJson(log => log.Information("{@MetricDefinitions}", definitions));
+        
+        Assert.False(jObject.ContainsKey("MetricDefinitions"));
         
         Assert.True(jObject.TryGetValue("@d", out var dValue));
         Assert.Equal("Gauge", dValue["cpu.usage"]!["kind"]);

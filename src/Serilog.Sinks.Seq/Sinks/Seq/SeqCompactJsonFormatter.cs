@@ -158,7 +158,7 @@ public sealed class SeqCompactJsonFormatter: ITextFormatter
         }
 
         var skipMetricProperties = false;
-        if (logEvent.Properties.TryGetValue("Definitions", out var d) && d is DictionaryValue or StructureValue)
+        if (logEvent.Properties.TryGetValue("MetricDefinitions", out var d))
         {
             skipMetricProperties = true;
             
@@ -174,7 +174,7 @@ public sealed class SeqCompactJsonFormatter: ITextFormatter
             if (skipSpanProperties && name is "SpanStartTimestamp" or "ParentSpanId" or "SpanKind")
                 continue;
 
-            if (skipMetricProperties && name is "Definitions")
+            if (skipMetricProperties && name is "MetricDefinitions")
                 continue;
 
             if (name.Length > 0 && name[0] == '@')
