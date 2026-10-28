@@ -166,7 +166,20 @@ public class SeqCompactJsonFormatterTests
         var ps = parent.SpanId;
         const ActivityKind sk = ActivityKind.Server;
         
-        var jObject = AssertValidJson(log => log.Information("{SpanStartTimestamp} {ParentSpanId} {SpanKind}", st, ps, sk));
+        var slTraceId1 = ActivityTraceId.CreateRandom();
+        var slSpanId1 = ActivitySpanId.CreateRandom();
+        var slTraceId2 = ActivityTraceId.CreateRandom();
+        var slSpanId2 = ActivitySpanId.CreateRandom();
+
+        var links = new[]
+        {
+            new ActivityLink(new ActivityContext(slTraceId1, slSpanId1, ActivityTraceFlags.Recorded)),
+            new ActivityLink(new ActivityContext(slTraceId2, slSpanId2, ActivityTraceFlags.None)),
+        };
+        
+        var jObject = AssertValidJson(log => log
+            .ForContext(new SpanLinkEnricher(links))
+            .Information("{SpanStartTimestamp} {ParentSpanId} {SpanKind}", st, ps, sk));
 
         Assert.False(jObject.ContainsKey("SpanStartTimestamp"));
 
@@ -184,6 +197,15 @@ public class SeqCompactJsonFormatterTests
 
         Assert.True(jObject.TryGetValue("@sk", out var skValue));
         Assert.Equal("Server", skValue.ToObject<string>());
+        
+        Assert.True(jObject.TryGetValue("@sl", out var slValue));
+        Assert.Equal(2, slValue.Count());
+
+        Assert.Equal(slTraceId1.ToHexString(), slValue[0]!["traceid"]);
+        Assert.Equal(slSpanId1.ToHexString(), slValue[0]!["spanid"]);
+
+        Assert.Equal(slTraceId2.ToHexString(), slValue[1]!["traceid"]);
+        Assert.Equal(slSpanId2.ToHexString(), slValue[1]!["spanid"]);
     }
     
     [Fact]
@@ -195,50 +217,5 @@ public class SeqCompactJsonFormatterTests
         Assert.True(jObject.ContainsKey("SpanStartTimestamp"));
         
         Assert.False(jObject.ContainsKey("@st"));
-    }
-    
-    [Fact]
-    public void SpanLinksGenerateValidJson()
-    {
-        var traceId1 = ActivityTraceId.CreateRandom();
-        var spanId1 = ActivitySpanId.CreateRandom();
-        var traceId2 = ActivityTraceId.CreateRandom();
-        var spanId2 = ActivitySpanId.CreateRandom();
-
-        var links = new[]
-        {
-            new Traceparent($"00-{traceId1.ToHexString()}-{spanId1.ToHexString()}-01"),
-            new Traceparent($"00-{traceId2.ToHexString()}-{spanId2.ToHexString()}-01"),
-        };
-
-        var json = AssertValidJson(
-            log => log.Information("With {SpanLinks}", links));
-
-        Assert.False(json.ContainsKey("SpanLinks"));
-
-        var sl = json["@sl"]!;
-        Assert.Equal(2, sl.Count());
-
-        Assert.Equal(traceId1.ToHexString(), sl[0]!["traceid"]);
-        Assert.Equal(spanId1.ToHexString(), sl[0]!["spanid"]);
-
-        Assert.Equal(traceId2.ToHexString(), sl[1]!["traceid"]);
-        Assert.Equal(spanId2.ToHexString(), sl[1]!["spanid"]);
-    }
-
-    [Fact]
-    public void IgnoresSpanLinksThatAreNotTraceparents()
-    {
-        var links = new[]
-        {
-            new Traceparent("not-a-traceparent"),
-        };
-
-        var json = AssertValidJson(
-            log => log.Information("With {SpanLinks}", links));
-
-        Assert.False(json.ContainsKey("@sl"));
-
-        Assert.True(json.ContainsKey("SpanLinks"));
     }
 }
